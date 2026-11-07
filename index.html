@@ -155,6 +155,18 @@
   .client-clear.show{display:flex}
   .client-clear svg{width:17px;height:17px;color:var(--cinza)}
   .ph-fill{background:#FFF3C4;color:#7a5c00;font-weight:800;padding:0 4px;border-radius:5px}
+  .head-ctrls{display:flex;align-items:center;gap:2px;flex:none}
+  .list-star{width:34px;height:34px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex:none}
+  .list-star svg{width:21px;height:21px;fill:none;stroke:var(--cinza);stroke-width:1.8}
+  .list-star.on svg{fill:var(--amarelo);stroke:var(--amarelo)}
+  .ico-btn[disabled]{opacity:.22;pointer-events:none}
+  .reorder{display:flex;flex-direction:column;gap:2px;flex:none;justify-content:center;margin-right:2px}
+  .reorder button{width:28px;height:16px;display:flex;align-items:center;justify-content:center;color:var(--cinza);border-radius:6px}
+  .reorder button:active{background:var(--fundo)}
+  .reorder button[disabled]{opacity:.22;pointer-events:none}
+  .reorder svg{width:14px;height:12px}
+  .chip.fav{border-color:var(--amarelo)}
+  .chip .fav-star{color:var(--amarelo);font-size:12px;margin-right:-2px}
   .filters{display:flex;gap:7px;overflow-x:auto;padding-bottom:10px;margin-bottom:2px;scrollbar-width:none}
   .filters::-webkit-scrollbar{display:none}
   .fchip{flex:none;background:#fff;border:1.5px solid var(--cinza-claro);border-radius:30px;padding:7px 14px;
@@ -398,8 +410,8 @@ function renderListsBar(){
   state.lists.forEach(function(l){
     var done=l.items.filter(function(i){return i.done;}).length;
     var b=document.createElement("button");
-    b.className="chip"+(l.id===state.curList?" active":"");
-    b.innerHTML='<span class="emoji">'+l.icon+'</span>'+esc(l.name)+
+    b.className="chip"+(l.id===state.curList?" active":"")+(l.fav?" fav":"");
+    b.innerHTML=(l.fav?'<span class="fav-star">★</span>':'')+'<span class="emoji">'+l.icon+'</span>'+esc(l.name)+
       '<span class="count">'+done+"/"+l.items.length+'</span>';
     b.onclick=function(){state.curList=l.id;save();renderAll();};
     bar.appendChild(b);
@@ -419,15 +431,20 @@ function renderCurrentList(){
   var done=l.items.filter(function(i){return i.done;}).length;
   var total=l.items.length;
   var pct=total?Math.round(done/total*100):0;
+  var li=state.lists.indexOf(l), nLists=state.lists.length;
 
   var html='<div class="card">';
   html+='<div class="list-head"><h2><span class="emoji">'+l.icon+'</span><span class="nm">'+esc(l.name)+'</span></h2>';
+  html+='<div class="head-ctrls">';
+  html+='<button class="list-star'+(l.fav?' on':'')+'" onclick="toggleListFav()" title="Favoritar lista"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></button>';
+  html+='<button class="ico-btn" onclick="moveList(-1)" title="Mover p/ esquerda"'+(li<=0?' disabled':'')+'><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button>';
+  html+='<button class="ico-btn" onclick="moveList(1)" title="Mover p/ direita"'+(li>=nLists-1?' disabled':'')+'><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></button>';
   html+='<div class="list-menu"><button class="ico-btn" onclick="toggleMenu(event)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="5" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="12" cy="19" r="1.6"/></svg></button>';
   html+='<div class="menu-pop" id="listMenu">'
     +'<button onclick="openListModal(true)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg>Renomear / ícone</button>'
     +'<button onclick="clearDone()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>Limpar concluídas</button>'
     +'<button class="danger" onclick="deleteList()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>Excluir lista</button>'
-    +'</div></div></div>';
+    +'</div></div></div></div>';
 
   html+='<div class="progress-wrap"><div class="progress-top"><span>'+done+' de '+total+' concluídas</span><span>'+pct+'%</span></div>'
     +'<div class="progress-bar"><div class="progress-fill" style="width:'+pct+'%"></div></div></div>';
@@ -438,7 +455,7 @@ function renderCurrentList(){
   if(total===0){
     html+='<div class="empty" style="padding:28px 10px"><h3>Lista vazia</h3><p>Adicione a primeira atividade acima.</p></div>';
   }else{
-    l.items.forEach(function(it){ html+=itemHTML(it); });
+    l.items.forEach(function(it,idx){ html+=itemHTML(it,idx,total); });
   }
 
   html+='<div class="list-footer">';
@@ -450,7 +467,7 @@ function renderCurrentList(){
   requestAnimationFrame(function(){var f=$(".progress-fill");if(f)f.style.width=pct+"%";});
 }
 
-function itemHTML(it){
+function itemHTML(it,idx,total){
   var hasC=!!(it.comment&&it.comment.trim());
   var h='<div class="item'+(it.done?" done":"")+'" data-id="'+it.id+'">';
   h+='<div class="item-main">';
@@ -460,6 +477,7 @@ function itemHTML(it){
   h+='<div class="comment-box" id="cb-'+it.id+'"><textarea placeholder="Comentário / observação..." oninput="saveComment(\''+it.id+'\',this.value)">'+esc(it.comment||"")+'</textarea></div>';
   h+='</div>';
   h+='<div class="item-actions">';
+  h+='<div class="reorder"><button onclick="moveItem(\''+it.id+'\',-1)" title="Subir"'+(idx<=0?' disabled':'')+'><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="18 15 12 9 6 15"/></svg></button><button onclick="moveItem(\''+it.id+'\',1)" title="Descer"'+(idx>=total-1?' disabled':'')+'><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></button></div>';
   h+='<button class="ico-btn'+(hasC?" has-comment":"")+'" onclick="toggleComment(\''+it.id+'\')" title="Comentário"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></button>';
   h+='<button class="ico-btn" onclick="editItem(\''+it.id+'\')" title="Editar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/></svg></button>';
   h+='<button class="ico-btn" onclick="delItem(\''+it.id+'\')" title="Excluir"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></button>';
@@ -468,6 +486,22 @@ function itemHTML(it){
 }
 
 function curList(){return state.lists.find(function(x){return x.id===state.curList;});}
+
+function moveItem(id,dir){
+  var l=curList(); if(!l)return; var i=-1;
+  for(var k=0;k<l.items.length;k++){ if(l.items[k].id===id){i=k;break;} }
+  var j=i+dir; if(i<0||j<0||j>=l.items.length)return;
+  var t=l.items[i]; l.items[i]=l.items[j]; l.items[j]=t; save(); renderAll();
+}
+function moveList(dir){
+  closeMenu();
+  var i=-1; for(var k=0;k<state.lists.length;k++){ if(state.lists[k].id===state.curList){i=k;break;} }
+  var j=i+dir; if(i<0||j<0||j>=state.lists.length)return;
+  var t=state.lists[i]; state.lists[i]=state.lists[j]; state.lists[j]=t; save(); renderAll();
+}
+function toggleListFav(){
+  var l=curList(); if(!l)return; l.fav=!l.fav; save(); renderAll();
+}
 
 function addItem(){
   var inp=$("#newItem"); if(!inp)return;
