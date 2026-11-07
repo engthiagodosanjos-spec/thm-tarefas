@@ -167,6 +167,13 @@
   .reorder svg{width:14px;height:12px}
   .chip.fav{border-color:var(--amarelo)}
   .chip .fav-star{color:var(--amarelo);font-size:12px;margin-right:-2px}
+  .sync-badge{position:absolute;top:calc(10px + env(safe-area-inset-top));right:12px;display:flex;align-items:center;gap:6px;
+    background:rgba(255,255,255,.16);color:#fff;font-size:10px;font-weight:700;padding:5px 10px;border-radius:20px;letter-spacing:.3px}
+  .sync-badge .dot{width:8px;height:8px;border-radius:50%;background:#FFC800;flex:none}
+  .sync-badge.ok .dot{background:#43B02A}
+  .sync-badge.err .dot{background:#ff5252}
+  .sync-badge.busy .dot{background:#FFC800;animation:pulse 1s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.25}}
   .filters{display:flex;gap:7px;overflow-x:auto;padding-bottom:10px;margin-bottom:2px;scrollbar-width:none}
   .filters::-webkit-scrollbar{display:none}
   .fchip{flex:none;background:#fff;border:1.5px solid var(--cinza-claro);border-radius:30px;padding:7px 14px;
@@ -260,6 +267,7 @@
     </div>
   </div>
   <div class="tagline">Mais Energia Para Um Amanhã Melhor</div>
+  <div class="sync-badge busy" id="syncBadge"><span class="dot"></span><span id="syncTxt">Iniciando…</span></div>
 </header>
 
 <nav class="tabs">
@@ -345,14 +353,45 @@ function $(s){return document.querySelector(s);}
 function esc(t){return (t||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");}
 function hoje(){var d=new Date();return d.toLocaleDateString("pt-BR");}
 
-function save(){
+/* Existe servidor (Apps Script)? Se o HTML for aberto solto, cai no modo só-local. */
+var HAS_SERVER=(typeof google!=="undefined" && google.script && google.script.run);
+var syncTimer=null;
+
+function setStatus(kind){
+  var b=document.getElementById("syncBadge"), t=document.getElementById("syncTxt");
+  if(!b||!t)return;
+  b.className="sync-badge";
+  if(!HAS_SERVER){b.classList.add("ok");t.textContent="Somente neste aparelho";return;}
+  if(kind==="ok"){b.classList.add("ok");t.textContent="Sincronizado";}
+  else if(kind==="busy"){b.classList.add("busy");t.textContent="Sincronizando…";}
+  else if(kind==="pend"){b.classList.add("busy");t.textContent="Salvando…";}
+  else if(kind==="err"){b.classList.add("err");t.textContent="Sem conexão (local)";}
+}
+
+/* Grava cache local na hora e agenda o envio para a planilha */
+function cacheLocal(){
   try{
     localStorage.setItem(LS_LISTS,JSON.stringify(state.lists));
     localStorage.setItem(LS_MSGS,JSON.stringify(state.msgs));
     localStorage.setItem(LS_UI,JSON.stringify({curList:state.curList,msgFilter:state.msgFilter}));
-  }catch(e){toast("Erro ao salvar dados","err");}
+  }catch(e){}
 }
-function load(){
+function save(){
+  cacheLocal();
+  if(HAS_SERVER){ setStatus("pend"); clearTimeout(syncTimer); syncTimer=setTimeout(pushNow,1200); }
+}
+function pushNow(){
+  if(!HAS_SERVER)return;
+  setStatus("busy");
+  var payload=JSON.stringify({lists:state.lists,msgs:state.msgs});
+  google.script.run
+    .withSuccessHandler(function(){setStatus("ok");})
+    .withFailureHandler(function(){setStatus("err");})
+    .salvarEstado(payload);
+}
+
+/* Lê cache local (instantâneo) */
+function loadLocal(){
   try{
     var l=localStorage.getItem(LS_LISTS), m=localStorage.getItem(LS_MSGS), u=localStorage.getItem(LS_UI);
     state.lists=l?JSON.parse(l):null;
@@ -360,9 +399,32 @@ function load(){
     var ui=u?JSON.parse(u):{};
     state.curList=ui.curList||null; state.msgFilter=ui.msgFilter||"todas";
   }catch(e){state.lists=null;state.msgs=null;}
-  if(!state.lists) state.lists=seedLists();
-  if(!state.msgs) state.msgs=seedMsgs();
+  if(!state.lists) state.lists = HAS_SERVER ? [] : seedLists();
+  if(!state.msgs)  state.msgs  = HAS_SERVER ? [] : seedMsgs();
   if(!state.curList && state.lists.length) state.curList=state.lists[0].id;
+}
+
+/* Boot: mostra cache na hora, depois busca a planilha (fonte da verdade) */
+function boot(){
+  loadLocal();
+  renderAll(); renderMsgFilters(); renderMessages();
+  if(!HAS_SERVER){ setStatus(); return; }
+  setStatus("busy");
+  google.script.run
+    .withSuccessHandler(function(json){
+      try{
+        var d=JSON.parse(json||"{}");
+        var servidorVazio=(!d.lists||!d.lists.length)&&(!d.msgs||!d.msgs.length);
+        var localTem=(state.lists&&state.lists.length)||(state.msgs&&state.msgs.length);
+        if(servidorVazio&&localTem){ pushNow(); return; } // 1ª vez: migra o local p/ a planilha
+        state.lists=d.lists||[]; state.msgs=d.msgs||[];
+        if(!state.curList && state.lists.length) state.curList=state.lists[0].id;
+        cacheLocal(); renderAll(); renderMsgFilters(); renderMessages();
+        setStatus("ok");
+      }catch(e){ setStatus("err"); }
+    })
+    .withFailureHandler(function(){ setStatus("err"); })
+    .carregarEstado();
 }
 
 /* ---------- Dados de exemplo (editáveis/apagáveis) ---------- */
@@ -801,10 +863,7 @@ function importData(ev){
 function renderAll(){renderListsBar();renderCurrentList();}
 
 /* ---- Init ---- */
-load();
-renderAll();
-renderMsgFilters();
-renderMessages();
+boot();
 </script>
 </body>
 </html>
